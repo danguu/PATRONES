@@ -1,0 +1,630 @@
+classDiagram
+direction LR
+
+%% =========================
+%% Geografía y Organización
+%% =========================
+class Departamento {
+  +UUID idDepartamento
+  +String nombre
+}
+class Municipio {
+  +UUID idMunicipio
+  +String nombre
+  +String codigoDANE
+  +UUID departamentoId
+}
+class OficinaEPS {
+  +UUID idOficina
+  +String nombre
+  +String direccion
+  +String telefono
+  +UUID municipioId
+}
+
+Departamento "1" --> "*" Municipio : contiene
+Municipio "1" --> "*" OficinaEPS : ubica
+
+%% =========================
+%% Afiliación y Recaudo
+%% =========================
+class Persona {
+  <<abstract>>
+  +UUID idPersona
+  +TipoDocumento tipoDocumento
+  +String numeroDocumento
+  +String nombres
+  +String apellidos
+  +Date fechaNacimiento
+  +Sexo sexo
+  +String telefono
+  +String email
+  +String direccion
+  +UUID municipioResidenciaId
+}
+
+class Afiliado {
+  +UUID idAfiliado
+  +TipoAfiliado tipoAfiliado
+  +Regimen regimen
+  +EstadoAfiliacion estadoAfiliacion
+  +Date fechaAfiliacion
+  +Date? fechaRetiro
+  +UUID planId
+}
+
+class NucleoFamiliar {
+  +UUID idNucleo
+  +String codigoFamilia
+  +Date fechaCreacion
+}
+
+class AfiliadoNucleo {
+  +UUID idAfiliadoNucleo
+  +Parentesco parentesco
+  +Date fechaInicio
+  +Date? fechaFin
+  +UUID nucleoId
+  +UUID afiliadoId
+}
+
+class Empleador {
+  +UUID idEmpleador
+  +String nit
+  +String razonSocial
+  +String direccion
+  +String telefono
+  +String email
+  +UUID municipioId
+}
+
+class ContratoAfiliacion {
+  +UUID idContrato
+  +String numeroContrato
+  +Date fechaInicio
+  +Date? fechaFin
+  +EstadoContrato estado
+  +TipoVinculacion tipoVinculacion
+  +UUID afiliadoId
+  +UUID? empleadorId
+}
+
+class PlanBeneficios {
+  +UUID idPlan
+  +String nombre
+  +String descripcion
+  +Date vigenciaDesde
+  +Date? vigenciaHasta
+}
+
+class Aporte {
+  +UUID idAporte
+  +String periodo  %% YYYY-MM
+  +Decimal baseCotizacion
+  +Decimal valorAporte
+  +Date? fechaPago
+  +EstadoAporte estado
+  +UUID contratoId
+}
+
+Persona <|-- Afiliado
+
+Municipio "1" --> "*" Persona : residencia
+Municipio "1" --> "*" Empleador : ubica
+
+NucleoFamiliar "1" --> "*" AfiliadoNucleo : agrupa
+Afiliado "1" --> "*" AfiliadoNucleo : pertenece
+
+Afiliado "1" --> "*" ContratoAfiliacion : tiene
+Empleador "0..1" --> "*" ContratoAfiliacion : vincula
+ContratoAfiliacion "1" --> "*" Aporte : genera
+
+PlanBeneficios "1" --> "*" Afiliado : aplica
+
+%% =========================
+%% Red de Prestadores (IPS)
+%% =========================
+class IPS {
+  +UUID idIPS
+  +String nit
+  +String nombre
+  +NivelAtencion nivelAtencion
+  +String email
+  +String telefono
+}
+
+class SedeIPS {
+  +UUID idSede
+  +String nombre
+  +String direccion
+  +String telefono
+  +UUID ipsId
+  +UUID municipioId
+}
+
+class ProfesionalSalud {
+  +UUID idProfesional
+  +String registroMedico
+  +String especialidad
+  +UUID sedeId
+}
+
+class ContratoIPS {
+  +UUID idContratoIPS
+  +String numero
+  +Date fechaInicio
+  +Date? fechaFin
+  +EstadoContrato estado
+  +ModalidadPago modalidadPago
+  +UUID ipsId
+}
+
+Persona <|-- ProfesionalSalud
+
+IPS "1" --> "*" SedeIPS : tiene
+Municipio "1" --> "*" SedeIPS : ubica
+SedeIPS "1" --> "*" ProfesionalSalud : asigna
+IPS "1" --> "*" ContratoIPS : contrata
+
+%% =========================
+%% Atención en Salud
+%% =========================
+class ServicioSalud {
+  +UUID idServicio
+  +String codigo
+  +String nombre
+  +TipoServicio tipo
+  +Boolean requiereAutorizacion
+}
+
+class Cita {
+  +UUID idCita
+  +DateTime fechaHora
+  +EstadoCita estado
+  +String motivo
+  +UUID afiliadoId
+  +UUID sedeId
+  +UUID? profesionalId
+  +UUID servicioId
+}
+
+Afiliado "1" --> "*" Cita : agenda
+SedeIPS "1" --> "*" Cita : atiende_en
+ProfesionalSalud "0..1" --> "*" Cita : atiende
+ServicioSalud "1" --> "*" Cita : para
+
+%% =========================
+%% Autorizaciones
+%% =========================
+class SolicitudAutorizacion {
+  +UUID idSolicitud
+  +DateTime fechaSolicitud
+  +EstadoSolicitud estado
+  +Prioridad prioridad
+  +String justificacion
+  +UUID afiliadoId
+  +UUID servicioId
+  +UUID sedeSolicitanteId
+  +UUID? profesionalSolicitanteId
+}
+
+class Autorizacion {
+  +UUID idAutorizacion
+  +String numeroAutorizacion
+  +DateTime fechaEmision
+  +Date? fechaVencimiento
+  +EstadoAutorizacion estado
+  +Integer cantidadAprobada
+  +Decimal? valorTope
+  +UUID solicitudId
+  +UUID sedeAutorizadaId
+}
+
+Afiliado "1" --> "*" SolicitudAutorizacion : solicita
+ServicioSalud "1" --> "*" SolicitudAutorizacion : para
+SedeIPS "1" --> "*" SolicitudAutorizacion : radica
+ProfesionalSalud "0..1" --> "*" SolicitudAutorizacion : ordena
+
+SolicitudAutorizacion "1" --> "0..1" Autorizacion : genera
+SedeIPS "1" --> "*" Autorizacion : autorizada_en
+
+%% =========================
+%% Historia Clínica (resumen)
+%% =========================
+class EventoClinico {
+  +UUID idEvento
+  +DateTime fechaHora
+  +TipoEventoClinico tipoEvento
+  +String observacion
+  +UUID afiliadoId
+  +UUID sedeId
+  +UUID? profesionalId
+  +UUID? autorizacionId
+  +UUID? citaId
+}
+
+class Diagnostico {
+  +UUID idDiagnostico
+  +String codigoCIE10
+  +String descripcion
+}
+
+class EventoDiagnostico {
+  +UUID idEventoDiagnostico
+  +TipoDx tipo
+  +UUID eventoId
+  +UUID diagnosticoId
+}
+
+Afiliado "1" --> "*" EventoClinico : registra
+SedeIPS "1" --> "*" EventoClinico : ocurre_en
+ProfesionalSalud "0..1" --> "*" EventoClinico : realiza
+Autorizacion "0..1" --> "*" EventoClinico : soporta
+Cita "0..1" --> "0..1" EventoClinico : deriva
+
+EventoClinico "1" --> "*" EventoDiagnostico : incluye
+Diagnostico "1" --> "*" EventoDiagnostico : clasifica
+
+%% =========================
+%% Facturación y Auditoría
+%% =========================
+class Factura {
+  +UUID idFactura
+  +String numeroFactura
+  +Date fechaEmision
+  +String periodo  %% YYYY-MM
+  +Decimal valorTotal
+  +EstadoFactura estado
+  +UUID ipsId
+  +UUID contratoIPSId
+}
+
+class DetalleFactura {
+  +UUID idDetalle
+  +Integer cantidad
+  +Decimal valorUnitario
+  +Decimal valorTotal
+  +UUID facturaId
+  +UUID servicioId
+  +UUID afiliadoId
+  +UUID? autorizacionId
+  +UUID? eventoClinicoId
+}
+
+class Auditoria {
+  +UUID idAuditoria
+  +TipoAuditoria tipo
+  +DateTime fechaInicio
+  +DateTime? fechaFin
+  +String resultado
+  +UUID facturaId
+  +UUID auditorId
+}
+
+class Glosa {
+  +UUID idGlosa
+  +String motivo
+  +Decimal valorGlosado
+  +EstadoGlosa estado
+  +UUID detalleFacturaId
+  +UUID auditoriaId
+}
+
+class PagoIPS {
+  +UUID idPago
+  +Date fechaPago
+  +Decimal valorPagado
+  +MedioPago medioPago
+  +UUID facturaId
+}
+
+IPS "1" --> "*" Factura : emite
+ContratoIPS "1" --> "*" Factura : por_contrato
+Factura "1" --> "*" DetalleFactura : detalla
+ServicioSalud "1" --> "*" DetalleFactura : cobra
+Afiliado "1" --> "*" DetalleFactura : a_nombre_de
+Autorizacion "0..1" --> "*" DetalleFactura : soporta
+EventoClinico "0..1" --> "*" DetalleFactura : evidencia
+
+Factura "1" --> "*" Auditoria : audita
+DetalleFactura "1" --> "*" Glosa : puede_tener
+Auditoria "1" --> "*" Glosa : genera
+Factura "1" --> "0..1" PagoIPS : paga
+
+%% =========================
+%% PQRS y Notificaciones
+%% =========================
+class PQRS {
+  +UUID idPQRS
+  +String radicado
+  +TipoPQRS tipo
+  +DateTime fechaRadicacion
+  +EstadoPQRS estado
+  +String descripcion
+  +UUID afiliadoId
+  +UUID oficinaId
+}
+
+class Notificacion {
+  +UUID idNotificacion
+  +CanalNotificacion canal
+  +String asunto
+  +String mensaje
+  +DateTime fechaEnvio
+  +EstadoNotificacion estado
+  +UUID? afiliadoId
+}
+
+class DocumentoSoporte {
+  +UUID idDocumento
+  +String nombreArchivo
+  +TipoDocumentoSoporte tipo
+  +String urlAlmacenamiento
+  +DateTime fechaCarga
+  +UUID? pqrsId
+  +UUID? solicitudId
+  +UUID? facturaId
+  +UUID? afiliadoId
+}
+
+Afiliado "1" --> "*" PQRS : radica
+OficinaEPS "1" --> "*" PQRS : recibe
+Afiliado "0..1" --> "*" Notificacion : recibe
+PQRS "0..1" --> "*" DocumentoSoporte : soporta
+SolicitudAutorizacion "0..1" --> "*" DocumentoSoporte : soporta
+Factura "0..1" --> "*" DocumentoSoporte : soporta
+Afiliado "0..1" --> "*" DocumentoSoporte : soporta
+
+%% =========================
+%% Seguridad y Usuarios
+%% =========================
+class UsuarioSistema {
+  +UUID idUsuario
+  +String username
+  +String hashPassword
+  +EstadoUsuario estado
+  +DateTime? ultimoAcceso
+  +UUID? personaId
+}
+
+class Rol {
+  +UUID idRol
+  +String nombre
+}
+
+class Permiso {
+  +UUID idPermiso
+  +String codigo
+  +String descripcion
+}
+
+class UsuarioRol {
+  +UUID idUsuarioRol
+  +UUID usuarioId
+  +UUID rolId
+}
+
+class RolPermiso {
+  +UUID idRolPermiso
+  +UUID rolId
+  +UUID permisoId
+}
+
+UsuarioSistema "1" --> "*" UsuarioRol : asigna
+Rol "1" --> "*" UsuarioRol : incluye
+Rol "1" --> "*" RolPermiso : otorga
+Permiso "1" --> "*" RolPermiso : define
+UsuarioSistema "1" --> "*" Auditoria : realiza
+
+%% =========================
+%% Enumeraciones (Enums)
+%% =========================
+class TipoDocumento {
+  <<enumeration>>
+  CC
+  TI
+  CE
+  PA
+}
+class Sexo {
+  <<enumeration>>
+  M
+  F
+  X
+}
+class Regimen {
+  <<enumeration>>
+  CONTRIBUTIVO
+  SUBSIDIADO
+  ESPECIAL
+}
+class TipoAfiliado {
+  <<enumeration>>
+  COTIZANTE
+  BENEFICIARIO
+}
+class EstadoAfiliacion {
+  <<enumeration>>
+  ACTIVO
+  SUSPENDIDO
+  RETIRADO
+}
+class EstadoContrato {
+  <<enumeration>>
+  ACTIVO
+  INACTIVO
+  CANCELADO
+}
+class TipoVinculacion {
+  <<enumeration>>
+  DEPENDIENTE
+  INDEPENDIENTE
+  SUBSIDIADO
+}
+class EstadoAporte {
+  <<enumeration>>
+  PENDIENTE
+  PAGADO
+  MORA
+}
+class NivelAtencion {
+  <<enumeration>>
+  I
+  II
+  III
+  IV
+}
+class ModalidadPago {
+  <<enumeration>>
+  CAPITACION
+  EVENTO
+  PAQUETE
+}
+class TipoServicio {
+  <<enumeration>>
+  CONSULTA
+  PROCEDIMIENTO
+  EXAMEN
+  MEDICAMENTO
+  URGENCIAS
+}
+class EstadoCita {
+  <<enumeration>>
+  SOLICITADA
+  ASIGNADA
+  ATENDIDA
+  CANCELADA
+  NO_ASISTE
+}
+class EstadoSolicitud {
+  <<enumeration>>
+  RADICADA
+  EN_REVISION
+  APROBADA
+  RECHAZADA
+  ANULADA
+}
+class Prioridad {
+  <<enumeration>>
+  BAJA
+  MEDIA
+  ALTA
+}
+class EstadoAutorizacion {
+  <<enumeration>>
+  VIGENTE
+  USADA
+  VENCIDA
+  ANULADA
+}
+class TipoEventoClinico {
+  <<enumeration>>
+  CONSULTA
+  PROCEDIMIENTO
+  EXAMEN
+  ENTREGA_MED
+}
+class TipoDx {
+  <<enumeration>>
+  PRINCIPAL
+  RELACIONADO
+}
+class EstadoFactura {
+  <<enumeration>>
+  RADICADA
+  EN_AUDITORIA
+  GLOSADA
+  APROBADA
+  PAGADA
+  RECHAZADA
+}
+class TipoAuditoria {
+  <<enumeration>>
+  CONCURRENTE
+  POSTERIOR
+  DOCUMENTAL
+}
+class EstadoGlosa {
+  <<enumeration>>
+  ABIERTA
+  ACEPTADA
+  LEVANTADA
+  EN_CONCILIACION
+}
+class MedioPago {
+  <<enumeration>>
+  TRANSFERENCIA
+  ACH
+  CHEQUE
+  OTRO
+}
+class TipoPQRS {
+  <<enumeration>>
+  PETICION
+  QUEJA
+  RECLAMO
+  SUGERENCIA
+}
+class EstadoPQRS {
+  <<enumeration>>
+  ABIERTA
+  EN_GESTION
+  RESPONDIDA
+  CERRADA
+}
+class CanalNotificacion {
+  <<enumeration>>
+  EMAIL
+  SMS
+  APP
+}
+class EstadoNotificacion {
+  <<enumeration>>
+  PENDIENTE
+  ENVIADA
+  FALLIDA
+}
+class TipoDocumentoSoporte {
+  <<enumeration>>
+  IDENTIDAD
+  FORMATO_AFILIACION
+  ORDEN_MEDICA
+  SOPORTE_PQRS
+  SOPORTE_FACTURA
+  OTRO
+}
+class EstadoUsuario {
+  <<enumeration>>
+  ACTIVO
+  BLOQUEADO
+  INACTIVO
+}
+
+%% (Opcional) asociaciones de enums a clases (referencias lógicas)
+Persona ..> TipoDocumento
+Persona ..> Sexo
+Afiliado ..> TipoAfiliado
+Afiliado ..> Regimen
+Afiliado ..> EstadoAfiliacion
+ContratoAfiliacion ..> EstadoContrato
+ContratoAfiliacion ..> TipoVinculacion
+Aporte ..> EstadoAporte
+IPS ..> NivelAtencion
+ContratoIPS ..> ModalidadPago
+ServicioSalud ..> TipoServicio
+Cita ..> EstadoCita
+SolicitudAutorizacion ..> EstadoSolicitud
+SolicitudAutorizacion ..> Prioridad
+Autorizacion ..> EstadoAutorizacion
+EventoClinico ..> TipoEventoClinico
+EventoDiagnostico ..> TipoDx
+Factura ..> EstadoFactura
+Auditoria ..> TipoAuditoria
+Glosa ..> EstadoGlosa
+PagoIPS ..> MedioPago
+PQRS ..> TipoPQRS
+PQRS ..> EstadoPQRS
+Notificacion ..> CanalNotificacion
+Notificacion ..> EstadoNotificacion
+DocumentoSoporte ..> TipoDocumentoSoporte
+UsuarioSistema ..> EstadoUsuario
